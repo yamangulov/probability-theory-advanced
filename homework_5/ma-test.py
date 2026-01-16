@@ -12,7 +12,8 @@ import os
 # Suppress warnings
 warnings.filterwarnings("ignore")
 
-def train_and_plot(q, train_data, test_data):
+
+def train_and_plot(q, train_data, test_data, df):
     """
     Функция для обучения модели и построения графика в отдельном процессе.
     """
@@ -26,32 +27,34 @@ def train_and_plot(q, train_data, test_data):
         start = test_data.index[0]
         end = test_data.index[-1]
         predictions = res.predict(start=start, end=end)
-        
+
         # Расчет MSE
         mse = ((predictions - test_data) ** 2).mean()
 
         # Построение графика
         # Используем объектный интерфейс matplotlib для безопасности в процессах
         fig, ax = plt.subplots(figsize=(12, 6))
-        ax.plot(test_data.index, test_data, label='Real (Test)', color='blue')
+        # Ограничение графика данными с 2003 по 2007 год
+        filtered_df = df.loc['2003':'2007']
+        ax.plot(filtered_df.index, filtered_df, label='Real (2003-2007)', color='blue')
         ax.plot(test_data.index, predictions, label=f'MA({q}) Prediction', color='red')
         ax.set_title(f'MA({q}) Model Comparison')
         ax.legend()
         ax.grid(True)
-        
+
         # Сохранение графика
         plot_filename = f'ma-test_{q}_plot.png'
-        # Путь сохранения относительно текущей директории запуска. 
+        # Путь сохранения относительно текущей директории запуска.
         # Если запускаем из корня, сохраняем в homework_5/.
         # Но чтобы было универсально, проверим, где мы.
         if os.path.exists('homework_5'):
-             save_path = f'homework_5/{plot_filename}'
+            save_path = f'homework_5/{plot_filename}'
         else:
-             save_path = plot_filename
-             
+            save_path = plot_filename
+
         fig.savefig(save_path)
         plt.close(fig)
-        
+
         description = ""
         if q == 1:
             description = "Модель MA(1) учитывает только одну предыдущую ошибку. График, вероятно, будет слабо повторять динамику, сглаживая ряд.\n\n"
@@ -72,6 +75,7 @@ def train_and_plot(q, train_data, test_data):
             'error': str(e),
             'success': False
         }
+
 
 def main():
     # 1. Загрузка данных
@@ -105,19 +109,19 @@ def main():
 
     # Список моделей MA(q)
     qs = [1, 2, 4, 40, 100]
-    
+
     # Параллельное выполнение
     results = []
     # Используем ProcessPoolExecutor для распараллеливания CPU-intensive задач
     with ProcessPoolExecutor() as executor:
         # map возвращает результаты в том же порядке, что и входные аргументы
-        futures = executor.map(train_and_plot, qs, [train]*len(qs), [test]*len(qs))
+        futures = executor.map(train_and_plot, qs, [train] * len(qs), [test] * len(qs), [df] * len(qs))
         results = list(futures)
 
     # Запись результатов в файл
     # Определяем путь к RESULT.md
     result_path = 'homework_5/RESULT_TEST.md' if os.path.exists('homework_5') else 'RESULT_TEST.md'
-    
+
     with open(result_path, 'w', encoding='utf-8') as f:
         f.write("# Результаты моделирования MA-процессов\n\n")
         f.write("Данные ограничены периодом до 2008 года.\n")
@@ -139,8 +143,10 @@ def main():
 
         f.write("## Общие выводы\n\n")
         f.write("С увеличением порядка q модель получает больше информации о прошлых шоках (ошибках).\n")
-        f.write("Ожидается, что при увеличении q качество подгонки может улучшаться до определенного момента, но слишком большое q может усложнить модель.\n")
+        f.write(
+            "Ожидается, что при увеличении q качество подгонки может улучшаться до определенного момента, но слишком большое q может усложнить модель.\n")
         f.write("Визуально нужно оценить, насколько красная линия близка к синей.\n")
+
 
 if __name__ == '__main__':
     main()
